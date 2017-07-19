@@ -1,0 +1,309 @@
+<!doctype html>
+<html>
+	<head>
+		<title>The Hanabi-game, on the web!</title>
+		<link rel="stylesheet" type="text/css" href="style.css">
+		<style>
+			.hand{
+				display: block;
+				margin-bottom: 8px;
+				padding: 5px;
+				background-color: #ccc;
+				height: 130px;
+				width: 420px;
+				border-radius: 10px;
+			}
+			.card{
+				width: 88px;
+				height: 120px;
+				border-radius: 8px;
+				border: 3px black solid;
+				float: left;
+				display: inline;
+				margin: 5px;
+			}
+			.card div{
+				background-color: white;
+				border-radius: 100%;
+				margin: auto;
+				width: 20px;
+				border: 2px solid black;
+				padding-left: 10px;
+				padding-right: 10px;
+				position: relative;
+				top: 50%;
+				transform: translateY(-50%);
+			}
+			.card div text{
+				font-size: 3em;
+			}
+
+			#piles{
+				display: block;
+				float: right;
+			}
+			.pile{
+				width: 100px;
+				height: 140px;
+				border: 4px solid black;
+				display: inline-block;
+				padding: 10px;
+			}
+			.pileRow{
+				display: block;
+			}
+
+			/*#throwpile{
+				background-color: #555;
+			}
+			#tomatopile{
+				background-color: tomato;
+			}
+			#dodgerbluepile{
+				background-color: dodgerblue;
+			}
+			#limegreenpile{
+				background-color: limegreen;
+			}
+			#goldpile{
+				background-color: gold;
+			}
+			#ivorypile{
+				background-color: ivory;
+			}*/
+		</style>
+	</head>
+	<body>
+		<span id="piles">
+			<span class="pileRow">
+				<span class="pile" id= "throwpile"><div class="card"></div></span>
+				<span class="pile" id= "tomatopile"><div class="card"></div></span>
+			</span>
+			<span class="pileRow">
+				<span class="pile" id= "dodgerbluepile"><div class="card"></div></span>
+				<span class="pile" id= "limegreenpile"><div class="card"></div></span>
+			</span>
+			<span class="pileRow">
+				<span class="pile" id= "goldpile"><div class="card"></div></span>
+				<span class="pile" id= "ivorypile"><div class="card"></div></span>
+			</span>
+		</span>
+		<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+		<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+		<script>
+			var goalPiles = {"tomato": [], "dodgerblue": [], "limegreen": [], "gold": [], "ivory": []};
+			var red = "tomato", blue = "dodgerblue", green = "limegreen", yellow = "gold", white = "ivory";
+
+			var imPlayerNumber = window.location.href.split("/");
+			imPlayerNumber = parseInt(imPlayerNumber[imPlayerNumber.length -1]);
+			var width = 960, height = 500;
+			var socket = io();
+			$(document).ready(function(){
+				var myPlayerIndex = 1;
+				socket.emit("ready", true);
+				socket.on("init", function(playerData){ //[Object, Object...]
+					console.log(playerData);
+					playerData.forEach(function(playerHand,playerIndex){ //Object {index: 0, hand: Array[4]}
+						var hand = $("<span>").addClass("hand").attr("id","hand"+playerIndex);
+						if(playerIndex === imPlayerNumber){
+							hand.addClass("back");
+						}
+						$("body").append(hand);
+						console.log(playerHand);
+						playerHand.hand.forEach(function(c, ci){
+							var card = cardToHTML(c);
+							hand.append(card);
+							if(hand.hasClass("back")){
+								card.css("background-color", "saddlebrown");
+								card.children().hide();
+
+							}
+							card.click(function(){
+								layCard(this);
+								drawCard(this,"hand"+playerIndex);
+							})
+						})
+						
+					})
+				})
+				socket.on("drawn card", function(dCard){
+					var card = cardToHTML(dCard.card);
+					//console.log($(dCard.parent))
+					var hand = $("#"+dCard.handID);
+					hand.append(card);
+					if(hand.hasClass("back")){
+						card.css("background-color", "saddlebrown");
+						card.children().hide();
+					}
+					card.click(function(){
+						layCard(this);
+						drawCard(this,dCard.handID);
+					})
+				})
+				socket.on("xe drew a card", function(card){
+					$("#"+card).remove();
+					console.log("Någon har nu dragit ett kort");
+					console.log(card);
+				})
+
+			})
+			function drawCard(card, handID){
+				$(card).remove();
+				console.log("Här dras ett kort:");
+				console.log($(card).attr("id"));
+				socket.emit("draw card", {"cardID": $(card).attr("id"), "handID": handID});
+			}
+
+			function cardToHTML(dataCard){
+				var card = $("<div>").addClass("card");
+				card.attr("cardColor", dataCard.color);
+				card.attr("cardValue", dataCard.value);
+				card.attr("id", dataCard.idString);
+				card.css("background-color", dataCard.color)
+				var innerFrame = $("<div>");
+				var number = $("<text>").text(dataCard.value);
+
+				innerFrame.append(number);
+				card.append(innerFrame);
+				return card;
+			}
+
+			function layCard(card){
+				console.log("Jag vill lägga det här kortet:");
+				console.log(card);
+				//var htmlCard = $(card);
+				var color = $(card).attr("cardColor");
+				console.log(color);
+				var coloredPile = goalPiles[color];
+				var htmlPile = $("#" + color + "pile");
+
+				var nonHTMLcard = {"color": color, "idString": $(card).attr("id"), "value": parseInt($(card).attr("cardValue"))};
+				if(coloredPile.length === 0){
+					if(parseInt($(card).attr("cardValue")) === 1){
+						console.log("Najs!")
+						htmlPile.empty();
+						htmlPile.append(cardToHTML(nonHTMLcard));
+						coloredPile.unshift(nonHTMLcard);
+					}else{
+						console.log("Onajs!");
+						$("#throwpile").empty();
+						$("#throwpile").append(cardToHTML(nonHTMLcard));
+					}
+				}else{
+					var topValue = parseInt(htmlPile.children().attr("cardValue"));
+					
+					if(nonHTMLcard.value === topValue + 1){
+						console.log("Najs!")
+						htmlPile.empty();
+						htmlPile.append(cardToHTML(nonHTMLcard));
+						coloredPile.unshift(nonHTMLcard);
+					}else{
+						console.log("Onajs!");
+						$("#throwpile").empty();
+						$("#throwpile").append(cardToHTML(nonHTMLcard));
+					}
+				}
+				console.log(goalPiles)
+				var points = [];
+				for(pile in goalPiles){
+					var value = goalPiles[pile][0];
+					if(value){
+						points.push(value.value)
+					}
+				}
+				console.log(points);
+				var totalPoints = points.reduce(function(a,b){
+					return a + b;
+				}, 0);
+				console.log(totalPoints);
+				if(totalPoints === 25){
+					alert("You won!");
+				}
+			}
+
+			/*var svg = d3.select("body").append("svg")
+				.attr("width", width).attr("height", height);
+
+			socket.on("add node", function(mouseEvent){
+				var rect = svg.append("circle")
+					.attr("r", 20)
+					.attr("cx", mouseEvent[0])
+					.attr("cy", mouseEvent[1])
+					.style("fill", "green");
+			})
+
+
+			socket.on("init", function(playerData){
+				//console.log(playerData);
+				var players = svg.selectAll("g")
+					.data(playerData).enter()
+					.append("g")
+					.attr("transform", function(d,i){
+						return "translate(50," + i*80 + ")";
+					});
+
+				var hands = players
+					.each(function(player){
+						var cards = d3.select(this).selectAll(".card")
+							.data(player.hand)
+							.enter().append("g")
+							.attr("transform", function(d,i){
+								return "translate(" + i*50 + ", 0)"
+							})
+
+						cards.append("rect")
+							.attr("class", "card")
+							//.attr("x", function(d,i){return i*50})
+							.style("fill", function(d){return d.color});
+
+						cards.append("text")
+							.text(function(d){
+								return d.value;
+							})
+							.attr("x", 15)
+							.attr("y", 30)
+							//.attr("text-anchor", "middle");
+
+						cards.on("click", function(c, i){
+							var card = d3.select(this);
+							card.remove();
+							socket.emit("draw card", card);
+							socket.on("drawn card", function(newCard){
+								player.hand.push(newCard);
+								cards.data(player.hand)
+									.enter().append("rect")
+									.attr("class", "card")
+									//.attr("x", function(d,i){return i*50})
+									.style("fill", function(d){return d.color});
+							})
+
+							/*console.log(card.text())
+							socket.emit("draw card", c);
+							socket.on("drawn card", function(newCard){
+								c = newCard;
+
+								cards.style("fill", function(d){return d.color});
+								/*.style("fill", newCard.color);
+								d3.select(this)
+								.text(newCard.value)
+							})
+						})
+					})
+
+				/*
+					.append("rect")
+					
+					//.attr("x", function(d,i){return i*50})
+					/*.style("fill", function(d,i){
+						console.log(d);
+						return d.hand[0].color;
+					})
+
+			})
+			*/
+			
+
+		</script>
+	</body>
+</html>

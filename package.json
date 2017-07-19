@@ -1,0 +1,19 @@
+{
+  "name": "Fyrverkeri",
+  "version": "1.0.0",
+  "description": "",
+  "main": "hanabi.js",
+  "dependencies": {
+    "babel": "^6.5.2",
+    "body-parser": "^1.15.1",
+    "jade": "^1.11.0",
+    "stylus": "^0.54.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Aiman Josefsson",
+  "license": "ISC"
+}
